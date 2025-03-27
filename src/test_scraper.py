@@ -1,53 +1,52 @@
 import asyncio
 from scraper import LogeionScraper
+import json
 
-async def test_single_page():
-    """Test scraping a single lemma page."""
+async def test_single_entry():
+    """Test fetching a single lexicon entry."""
     scraper = LogeionScraper()
-    test_url = "https://logeion.uchicago.edu/ἀγαθός"
+    lemma = "ἀγαθός"
     
-    async with scraper:
-        # Test page fetching
-        content = await scraper.get_page_content(test_url)
-        if content:
-            print("✓ Successfully fetched page content")
-        else:
-            print("✗ Failed to fetch page content")
-            return
-
-        # Test parsing
-        entries = await scraper.parse_lexicon_entry(content, test_url)
-        if entries:
-            print(f"✓ Successfully parsed {len(entries)} dictionary entries")
-            for entry in entries:
-                print(f"\nSource: {entry['lexicon_source']}")
-                print(f"Lemma: {entry['lemma']}")
-                print(f"Definition preview: {entry['definition'][:100]}...")
-        else:
-            print("✗ Failed to parse entries")
+    print(f"\nTesting lexicon entry for '{lemma}':")
+    entry = await scraper.get_lexicon_entry(lemma)
+    if entry:
+        print(f"Language: {entry['language']}")
+        print("Details preview:")
+        print(json.dumps(entry['details'], indent=2, ensure_ascii=False)[:500] + "...")
+    else:
+        print("Failed to fetch entry")
 
 async def test_lemma_discovery():
-    """Test discovering lemma links from an index page."""
+    """Test discovering lemmas starting with a letter."""
     scraper = LogeionScraper()
-    test_url = "https://logeion.uchicago.edu/α"
+    letter = "α"
     
-    async with scraper:
-        lemma_urls = await scraper.discover_lemmas(test_url)
-        if lemma_urls:
-            print(f"\n✓ Successfully discovered {len(lemma_urls)} lemma links")
-            print("Sample URLs:")
-            for url in lemma_urls[:5]:
-                print(f"  - {url}")
-        else:
-            print("\n✗ Failed to discover lemma links")
+    print(f"\nTesting lemma discovery for letter '{letter}':")
+    lemmas = await scraper.discover_lemmas(letter)
+    print(f"Found {len(lemmas)} lemmas")
+    print("Sample lemmas:")
+    for lemma in list(lemmas)[:5]:
+        print(f"- {lemma}")
+
+async def test_corpus_site():
+    """Test getting corpus site URL for a lemma."""
+    scraper = LogeionScraper()
+    lemma = "ἀγαθός"
+    
+    print(f"\nTesting corpus site for '{lemma}':")
+    url = await scraper.get_corpus_site(lemma)
+    if url:
+        print(f"Corpus site URL: {url}")
+    else:
+        print("Failed to get corpus site URL")
 
 async def main():
+    """Run all tests."""
     print("Testing Logeion Scraper...")
-    print("\n1. Testing single page scraping:")
-    await test_single_page()
     
-    print("\n2. Testing lemma discovery:")
+    await test_single_entry()
     await test_lemma_discovery()
+    await test_corpus_site()
 
 if __name__ == "__main__":
     asyncio.run(main()) 
