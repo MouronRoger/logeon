@@ -2,13 +2,20 @@ import asyncio
 import aiohttp
 import json
 import logging
+import os
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, unquote, quote
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 from pathlib import Path
 import re
 from database import Database
+
+# Configuration
+API_KEY = os.getenv("LOGEION_API_KEY", "AIzaSyCT5aVzk3Yx-m8FH8rmTpEgfVyVA3pYbqg")  # Default to public key if env not set
+CONCURRENCY = 3  # Max concurrent requests
+REQUEST_DELAY = 1.2  # Seconds between requests
+MAX_RETRIES = 3  # Maximum retry attempts for failed requests
 
 # Greek letter mapping
 GREEK_LETTERS = {
@@ -73,10 +80,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class LogeionScraper:
-    def __init__(self, delay: float = 1.2):
+    def __init__(self, delay: float = REQUEST_DELAY):
         self.delay = delay
         self.last_request_time = 0
-        self.api_key = "AIzaSyCT5aVzk3Yx-m8FH8rmTpEgfVyVA3pYbqg"  # This is a public API key from their website
+        self.api_key = API_KEY
         self.base_url = "https://anastrophe.uchicago.edu/logeion-api"
         self.db = Database()
 
@@ -89,91 +96,205 @@ class LogeionScraper:
         self.last_request_time = time.time()
 
     async def _make_request(self, session: aiohttp.ClientSession, url: str) -> Optional[Dict]:
-        """Make a request to the API with proper error handling."""
-        try:
-            async with session.get(url) as response:
-                if response.status != 200:
-                    logger.error(f"Request failed: {url} (Status: {response.status})")
+        """Make API request with retries and error handling"""
+        for attempt in range(MAX_RETRIES):
+            try:
+                async with session.get(url) as response:
+                    if response.status != 200:
+                        logger.error(f"Request failed: {url} (Status: {response.status})")
+                        await asyncio.sleep(self.delay * (attempt + 1))
+                        continue
+                    return await response.json()
+            except (aiohttp.ClientError, json.JSONDecodeError) as e:
+                logger.error(f"Request error: {url} ({str(e)})")
+                if attempt == MAX_RETRIES - 1:
                     return None
-                return await response.json()
-        except aiohttp.ClientError as e:
-            logger.error(f"Request error: {url} ({str(e)})")
-            return None
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {url} ({str(e)})")
-            return None
+                await asyncio.sleep(self.delay * (attempt + 1))
+        return None
 
     async def get_lexicon_entry(self, lemma: str) -> Optional[Dict]:
-        """Fetch lexicon entry for a given lemma."""
+        """Fetch complete lexicon entry for a lemma, including language and definitions"""
         await self._wait_for_delay()
         
+        # Check if we already have this entry
+        existing_entry = await self.db.get_lexicon_entry(lemma)
+        if existing_entry:
+            return existing_entry
+            
         encoded_lemma = quote(lemma)
         async with aiohttp.ClientSession() as session:
-            # First check the language
+            # Check language first
             lang_url = f"{self.base_url}/checkLang/?key={self.api_key}&text={encoded_lemma}"
             lang_data = await self._make_request(session, lang_url)
             if not lang_data:
                 return None
                 
-            # Get the detailed entry
+            # Get detailed entry data
             detail_url = f"{self.base_url}/detail?key={self.api_key}&type=normal&w={encoded_lemma}"
             detail_data = await self._make_request(session, detail_url)
             if not detail_data:
                 return None
             
-            return {
+            entry = {
                 'lemma': lemma,
                 'language': lang_data.get('lang'),
-                'details': detail_data.get('detail', {})
+                'details': detail_data.get('detail', {}),
+                'source': 'LSJ'  # Default for Greek entries
             }
+            
+            # Store in database
+            await self.db.add_lexicon_entry(entry)
+            return entry
+
+    async def process_letter(self, letter: str) -> Tuple[int, int]:
+        """Process all lemmas for a given letter"""
+        lemmas = await self.discover_lemmas(letter)
+        total = len(lemmas)
+        completed = 0
+        
+        async def process_lemma(lemma: str):
+            entry = await self.get_lexicon_entry(lemma)
+            if entry:
+                nonlocal completed
+                completed += 1
+                if completed % 10 == 0:  # Progress update every 10 entries
+                    logger.info(f"Letter {letter}: {completed}/{total} lemmas processed")
+            
+        # Process lemmas concurrently with rate limiting
+        tasks = []
+        for lemma in lemmas:
+            if len(tasks) >= CONCURRENCY:
+                await asyncio.gather(*tasks)
+                tasks = []
+            tasks.append(process_lemma(lemma))
+        
+        if tasks:
+            await asyncio.gather(*tasks)
+            
+        return total, completed
+
+    async def run_scraper(self, letters: List[str] = None):
+        """Main scraping orchestration"""
+        if not letters:
+            letters = list(GREEK_LETTERS.keys())
+            
+        total_processed = 0
+        total_lemmas = 0
+        
+        for letter in letters:
+            logger.info(f"Starting letter: {letter}")
+            total, completed = await self.process_letter(letter)
+            total_lemmas += total
+            total_processed += completed
+            
+            # Log progress after each letter
+            progress = await self.db.get_progress()
+            logger.info(
+                f"Progress: {progress['completed']} completed | "
+                f"{progress['pending']} pending | "
+                f"{progress['failed']} failed | "
+                f"{progress['processing']} processing"
+            )
+            
+        return total_processed, total_lemmas
+
+    async def resume_scraping(self):
+        """Resume scraping from last point"""
+        while True:
+            next_url = await self.db.get_next_url()
+            if not next_url:
+                break
+                
+            url, retry_count = next_url
+            try:
+                # Process URL
+                entry = await self._process_url(url)
+                if entry:
+                    await self.db.mark_url_completed(url)
+                else:
+                    await self.db.mark_url_failed(url, "Failed to process URL")
+            except Exception as e:
+                await self.db.mark_url_failed(url, str(e))
+            
+            # Log progress periodically
+            if retry_count % 10 == 0:
+                progress = await self.db.get_progress()
+                logger.info(
+                    f"Progress: {progress['completed']} completed | "
+                    f"{progress['pending']} pending | "
+                    f"{progress['failed']} failed"
+                )
+
+    async def export_results(self, output_path: str = "lexicon_export.json"):
+        """Export all scraped entries to JSON"""
+        success = await self.db.export_to_json(output_path)
+        if success:
+            logger.info(f"Successfully exported data to {output_path}")
+        else:
+            logger.error("Failed to export data")
+
+    async def retry_failed(self):
+        """Retry all failed URLs"""
+        reset_count = await self.db.reset_failed()
+        if reset_count > 0:
+            logger.info(f"Reset {reset_count} failed URLs for retry")
+            await self.resume_scraping()
+        else:
+            logger.info("No failed URLs to retry")
 
     async def discover_lemmas(self, letter: str) -> Set[str]:
-        """Discover lemmas starting with a given letter."""
+        """Find all available lemmas starting with given letter using common lemmas as seed"""
         letter = letter.lower()
         if letter not in COMMON_GREEK_LEMMAS:
             logger.warning(f"No common lemmas found for letter '{letter}'")
             return set()
         
-        # Start with the common lemmas for this letter
         lemmas = set(COMMON_GREEK_LEMMAS[letter])
         logger.info(f"Starting with {len(lemmas)} common lemmas for letter '{letter}'")
         
-        # Try to find related lemmas for each common lemma
         async with aiohttp.ClientSession() as session:
-            for lemma in list(lemmas):  # Create a copy of the set to iterate over
-                await self._wait_for_delay()
-                
-                # First check if this is a valid lemma
-                lang_url = f"{self.base_url}/checkLang/?key={self.api_key}&text={quote(lemma)}"
-                lang_data = await self._make_request(session, lang_url)
-                if not lang_data or lang_data.get('lang') != 'greek':
-                    continue
-                
-                # Then try to find related lemmas
-                find_url = f"{self.base_url}/find?key={self.api_key}&w={quote(lemma)}"
-                find_data = await self._make_request(session, find_url)
-                if find_data and 'parses' in find_data:
-                    for parse in find_data['parses']:
-                        if 'lemma' in parse:
-                            new_lemma = parse['lemma']
-                            # Only add lemmas that start with the same letter
-                            if new_lemma.lower().startswith(letter):
-                                lemmas.add(new_lemma)
+            tasks = []
+            for lemma in list(lemmas):
+                if len(tasks) >= CONCURRENCY:
+                    await asyncio.gather(*tasks)
+                    tasks = []
+                tasks.append(self._process_lemma(session, lemma, letter, lemmas))
+            
+            if tasks:
+                await asyncio.gather(*tasks)
         
         logger.info(f"Found {len(lemmas)} total lemmas for letter '{letter}'")
         return lemmas
 
+    async def _process_lemma(self, session: aiohttp.ClientSession, lemma: str, letter: str, lemmas: Set[str]):
+        """Helper for discover_lemmas to process a single lemma and find related ones"""
+        await self._wait_for_delay()
+        
+        # Verify it's a Greek lemma
+        lang_url = f"{self.base_url}/checkLang/?key={self.api_key}&text={quote(lemma)}"
+        lang_data = await self._make_request(session, lang_url)
+        if not lang_data or lang_data.get('lang') != 'greek':
+            return
+        
+        # Find related lemmas
+        find_url = f"{self.base_url}/find?key={self.api_key}&w={quote(lemma)}"
+        find_data = await self._make_request(session, find_url)
+        if find_data and 'parses' in find_data:
+            for parse in find_data['parses']:
+                if 'lemma' in parse:
+                    new_lemma = parse['lemma']
+                    if new_lemma.lower().startswith(letter):
+                        lemmas.add(new_lemma)
+
     async def get_corpus_site(self, lemma: str) -> Optional[str]:
-        """Get the corpus site URL for a lemma."""
+        """Get reference corpus URL for a lemma"""
         await self._wait_for_delay()
         
         encoded_lemma = quote(lemma)
         async with aiohttp.ClientSession() as session:
             url = f"{self.base_url}/getCorpusSite?displayed={encoded_lemma}&key={self.api_key}"
             data = await self._make_request(session, url)
-            if not data:
-                return None
-            return data.get('lemmaSite')
+            return data.get('lemmaSite') if data else None
 
     async def get_page_content(self, url: str) -> Optional[str]:
         """Fetch page content with retry logic and rate limiting."""
@@ -275,7 +396,7 @@ class LogeionScraper:
             self.db.update_url_status(url, 'error', str(e))
             return False
 
-    async def run(self, concurrent_tasks: int = 3):
+    async def run(self, concurrent_tasks: int = CONCURRENCY):
         """Main scraping loop."""
         while True:
             url = self.db.get_next_url()

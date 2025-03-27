@@ -1,6 +1,8 @@
 import asyncio
 from scraper import LogeionScraper
 import json
+import pytest
+import aiosqlite
 
 async def test_single_entry():
     """Test fetching a single lexicon entry."""
@@ -53,6 +55,52 @@ async def main():
     await test_single_entry()
     await test_lemma_discovery()
     await test_corpus_site()
+
+@pytest.mark.asyncio
+async def test_get_lexicon_entry():
+    """Canary test: Verify we can fetch a basic Greek lemma entry"""
+    scraper = LogeionScraper()
+    result = await scraper.get_lexicon_entry('λόγος')
+    
+    assert result is not None
+    assert result['lemma'] == 'λόγος'
+    assert result['language'] == 'greek'
+    assert 'details' in result
+    
+@pytest.mark.asyncio
+async def test_db_insert():
+    """Canary test: Verify basic database operations work"""
+    async with aiosqlite.connect(':memory:') as db:
+        # Create test table
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS lemmas (
+                id INTEGER PRIMARY KEY,
+                lemma TEXT NOT NULL,
+                language TEXT NOT NULL,
+                details TEXT NOT NULL
+            )
+        ''')
+        
+        # Insert test data
+        test_data = {
+            'lemma': 'λόγος',
+            'language': 'greek',
+            'details': '{"test": "data"}'
+        }
+        
+        await db.execute(
+            'INSERT INTO lemmas (lemma, language, details) VALUES (?, ?, ?)',
+            (test_data['lemma'], test_data['language'], test_data['details'])
+        )
+        await db.commit()
+        
+        # Verify insertion
+        async with db.execute('SELECT * FROM lemmas WHERE lemma = ?', (test_data['lemma'],)) as cursor:
+            row = await cursor.fetchone()
+            assert row is not None
+            assert row[1] == test_data['lemma']
+            assert row[2] == test_data['language']
+            assert row[3] == test_data['details']
 
 if __name__ == "__main__":
     asyncio.run(main()) 
