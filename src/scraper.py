@@ -38,6 +38,34 @@ GREEK_LETTERS = {
     'ω': 'omega'
 }
 
+# Common Greek lemmas for each letter
+COMMON_GREEK_LEMMAS = {
+    'α': ['ἀγαθός', 'ἄγω', 'ἀνήρ', 'ἄνθρωπος', 'ἀρχή'],
+    'β': ['βαίνω', 'βάλλω', 'βασιλεύς', 'βίος', 'βούλομαι'],
+    'γ': ['γῆ', 'γίγνομαι', 'γιγνώσκω', 'γράφω', 'γυνή'],
+    'δ': ['δεῖ', 'δέχομαι', 'δῆμος', 'διά', 'δίδωμι'],
+    'ε': ['ἐγώ', 'εἰμί', 'εἶπον', 'ἔρχομαι', 'ἔχω'],
+    'ζ': ['ζάω', 'ζεύς', 'ζητέω', 'ζωή', 'ζῷον'],
+    'η': ['ἡγέομαι', 'ἥκω', 'ἡμέρα', 'ἥρως', 'ἡσυχία'],
+    'θ': ['θάλασσα', 'θάνατος', 'θεός', 'θυμός', 'θύω'],
+    'ι': ['ἰδεῖν', 'ἱερός', 'ἵημι', 'ἵππος', 'ἴσος'],
+    'κ': ['καί', 'καλέω', 'καλός', 'κατά', 'κεῖμαι'],
+    'λ': ['λαμβάνω', 'λέγω', 'λείπω', 'λόγος', 'λύω'],
+    'μ': ['μάχη', 'μέγας', 'μένω', 'μή', 'μόνος'],
+    'ν': ['ναῦς', 'νέος', 'νῆσος', 'νικάω', 'νόμος'],
+    'ξ': ['ξένος', 'ξίφος', 'ξύλον', 'ξυνός', 'ξύν'],
+    'ο': ['ὁδός', 'οἶδα', 'οἶκος', 'ὄνομα', 'ὁράω'],
+    'π': ['παῖς', 'πᾶς', 'πατήρ', 'πόλις', 'πρός'],
+    'ρ': ['ῥέω', 'ῥήτωρ', 'ῥίπτω', 'ῥώμη', 'ῥώννυμι'],
+    'σ': ['σοφία', 'σοφός', 'στρατός', 'σύ', 'σῶμα'],
+    'τ': ['τάσσω', 'τε', 'τίθημι', 'τις', 'τόπος'],
+    'υ': ['ὕδωρ', 'υἱός', 'ὕπνος', 'ὑπό', 'ὕστερος'],
+    'φ': ['φαίνω', 'φέρω', 'φημί', 'φίλος', 'φύσις'],
+    'χ': ['χαίρω', 'χείρ', 'χρή', 'χρόνος', 'χώρα'],
+    'ψ': ['ψεύδω', 'ψηφίζομαι', 'ψυχή', 'ψύχω', 'ψαύω'],
+    'ω': ['ὦ', 'ὧδε', 'ὥρα', 'ὡς', 'ὠφελέω']
+}
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
@@ -101,34 +129,39 @@ class LogeionScraper:
 
     async def discover_lemmas(self, letter: str) -> Set[str]:
         """Discover lemmas starting with a given letter."""
-        await self._wait_for_delay()
+        letter = letter.lower()
+        if letter not in COMMON_GREEK_LEMMAS:
+            logger.warning(f"No common lemmas found for letter '{letter}'")
+            return set()
         
-        # If it's a Greek letter, try both the letter itself and its name
-        encoded_letter = quote(letter)
-        letter_name = GREEK_LETTERS.get(letter.lower())
+        # Start with the common lemmas for this letter
+        lemmas = set(COMMON_GREEK_LEMMAS[letter])
+        logger.info(f"Starting with {len(lemmas)} common lemmas for letter '{letter}'")
         
+        # Try to find related lemmas for each common lemma
         async with aiohttp.ClientSession() as session:
-            lemmas = set()
-            
-            # Try with the letter itself
-            find_url = f"{self.base_url}/find?key={self.api_key}&w={encoded_letter}"
-            find_data = await self._make_request(session, find_url)
-            if find_data and 'parses' in find_data:
-                for parse in find_data['parses']:
-                    if 'lemma' in parse:
-                        lemmas.add(parse['lemma'])
-            
-            # If we have a letter name, try that too
-            if letter_name:
-                find_url = f"{self.base_url}/find?key={self.api_key}&w={letter_name}"
+            for lemma in list(lemmas):  # Create a copy of the set to iterate over
+                await self._wait_for_delay()
+                
+                # First check if this is a valid lemma
+                lang_url = f"{self.base_url}/checkLang/?key={self.api_key}&text={quote(lemma)}"
+                lang_data = await self._make_request(session, lang_url)
+                if not lang_data or lang_data.get('lang') != 'greek':
+                    continue
+                
+                # Then try to find related lemmas
+                find_url = f"{self.base_url}/find?key={self.api_key}&w={quote(lemma)}"
                 find_data = await self._make_request(session, find_url)
                 if find_data and 'parses' in find_data:
                     for parse in find_data['parses']:
                         if 'lemma' in parse:
-                            lemmas.add(parse['lemma'])
-            
-            logger.info(f"Found {len(lemmas)} lemmas for letter '{letter}'")
-            return lemmas
+                            new_lemma = parse['lemma']
+                            # Only add lemmas that start with the same letter
+                            if new_lemma.lower().startswith(letter):
+                                lemmas.add(new_lemma)
+        
+        logger.info(f"Found {len(lemmas)} total lemmas for letter '{letter}'")
+        return lemmas
 
     async def get_corpus_site(self, lemma: str) -> Optional[str]:
         """Get the corpus site URL for a lemma."""
@@ -140,12 +173,7 @@ class LogeionScraper:
             data = await self._make_request(session, url)
             if not data:
                 return None
-            async with session.get(url) as response:
-                if response.status != 200:
-                    logger.error(f"Failed to get corpus site for {lemma}: {response.status}")
-                    return None
-                data = await response.json()
-                return data.get('lemmaSite')
+            return data.get('lemmaSite')
 
     async def get_page_content(self, url: str) -> Optional[str]:
         """Fetch page content with retry logic and rate limiting."""

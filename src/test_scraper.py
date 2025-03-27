@@ -24,9 +24,15 @@ async def test_lemma_discovery():
     print(f"\nTesting lemma discovery for letter '{letter}':")
     lemmas = await scraper.discover_lemmas(letter)
     print(f"Found {len(lemmas)} lemmas")
-    print("Sample lemmas:")
-    for lemma in list(lemmas)[:5]:
-        print(f"- {lemma}")
+    if lemmas:
+        print("Sample lemmas:")
+        for lemma in sorted(list(lemmas))[:5]:
+            print(f"- {lemma}")
+            # Test getting an entry for this lemma
+            entry = await scraper.get_lexicon_entry(lemma)
+            if entry:
+                print(f"  Language: {entry['language']}")
+                print(f"  Has details: {'details' in entry and bool(entry['details'])}")
 
 async def test_corpus_site():
     """Test getting corpus site URL for a lemma."""
