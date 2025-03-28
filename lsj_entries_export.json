@@ -1,0 +1,38 @@
+{
+  "Α_Α-α+": {
+    "letter": "Α",
+    "group": "Α-α+",
+    "url": "https://www.perseus.tufts.edu/hopper/text?doc=Perseus:text:1999.04.0057:entry%20group=α+",
+    "content": {
+      "text": "",
+      "html": ""
+    }
+  },
+  "Α_Α-αβ": {
+    "letter": "Α",
+    "group": "Α-αβ",
+    "url": "https://www.perseus.tufts.edu/hopper/text?doc=Perseus:text:1999.04.0057:entry%20group=αβ",
+    "content": {
+      "text": "",
+      "html": ""
+    }
+  },
+  "Α_complete": {
+    "letter": "Α",
+    "group": "Α - Complete Letter Entries",
+    "url": "https://www.perseus.tufts.edu/hopper/text?doc=Perseus:text:1999.04.0057:alphabetic%20letter=*a",
+    "content": {
+      "text": "Α α, ἄλφα  (q.v.), τό, indecl., first letter of the Gr. alphabet: as Numeral, ά A.= εἷς and πρῶτος, but 'α =  1,000.",
+      "html": "<div class=\"text\"><b><span class=\"greek\"><a href=\"morph?l=*a&amp;la=greek&amp;can=*a0\" onclick=\"m(this,1,0); return false\" target=\"morph\">Α</a> <a href=\"morph?l=a&amp;la=greek&amp;can=a0&amp;prior=*a\" onclick=\"m(this,1,0); return false\" target=\"morph\">α</a>,</span></b> <b><span class=\"greek\"><a href=\"morph?l=a%29%2Flfa&amp;la=greek&amp;can=a%29%2Flfa0&amp;prior=a\" onclick=\"m(this,1,0); return false\" target=\"morph\">ἄλφα</a></span></b>  (q.v.), <span class=\"greek\"><a href=\"morph?l=to%2F&amp;la=greek&amp;can=to%2F0&amp;prior=a)/lfa\" onclick=\"m(this,1,0); return false\" target=\"morph\">τό</a></span>, indecl., first letter of the Gr. alphabet: as Numeral, <span class=\"greek\"><a href=\"morph?l=a%2F&amp;la=greek&amp;can=a%2F0&amp;prior=to/\" onclick=\"m(this,1,0); return false\" target=\"morph\">ά</a></span> <div class=\"lex_sense lex_sense1\"><b>A.</b>= <span class=\"greek\"><a href=\"morph?l=ei%28%3Ds&amp;la=greek&amp;can=ei%28%3Ds0&amp;prior=a/\" onclick=\"m(this,1,0); return false\" target=\"morph\">εἷς</a></span> and <span class=\"greek\"><a href=\"morph?l=prw%3Dtos&amp;la=greek&amp;can=prw%3Dtos0&amp;prior=ei(=s\" onclick=\"m(this,1,0); return false\" target=\"morph\">πρῶτος</a>,</span> but <span class=\"greek\">'<a href=\"morph?l=a&amp;la=greek&amp;can=a1&amp;prior=prw=tos\" onclick=\"m(this,2,0); return false\" target=\"morph\">α</a></span> =  <i><span class=\"en\">1</span></i>,<i><span class=\"en\">000</span></i>.</div> </div>"
+    }
+  },
+  "Β_complete": {
+    "letter": "Β",
+    "group": "Β - Complete Letter Entries",
+    "url": "https://www.perseus.tufts.edu/hopper/text?doc=Perseus:text:1999.04.0057:alphabetic%20letter=*b",
+    "content": {
+      "text": "β , βῆτα , indecl., second letter of the Gr. alphabet: hence as numeral, β́ A.= δύο and δεύτερος, but β᾽ =  2,000. II. to represent ϝ, freq. in Hsch., esp. in Lacon. words, cf. βείκατι, etc.",
+      "html": "<div class=\"text\"><b><span class=\"greek\"><a href=\"morph?l=b&amp;la=greek&amp;can=b0\" onclick=\"m(this,1,0); return false\" target=\"morph\">β</a></span></b> , <b><span class=\"greek\"><a href=\"morph?l=bh%3Dta&amp;la=greek&amp;can=bh%3Dta0&amp;prior=b\" onclick=\"m(this,1,0); return false\" target=\"morph\">βῆτα</a></span></b> , indecl., second letter of the Gr. alphabet: hence as numeral, <span class=\"greek\"><a href=\"morph?l=b%2F&amp;la=greek&amp;can=b%2F0&amp;prior=bh=ta\" onclick=\"m(this,1,0); return false\" target=\"morph\">β́</a></span> <div class=\"lex_sense lex_sense1\"><b>A.</b>= <span class=\"greek\"><a href=\"morph?l=du%2Fo&amp;la=greek&amp;can=du%2Fo0&amp;prior=b/\" onclick=\"m(this,1,0); return false\" target=\"morph\">δύο</a></span> and <span class=\"greek\"><a href=\"morph?l=deu%2Fteros&amp;la=greek&amp;can=deu%2Fteros0&amp;prior=du/o\" onclick=\"m(this,1,0); return false\" target=\"morph\">δεύτερος</a>,</span> but <span class=\"greek\"><a href=\"morph?l=b%27&amp;la=greek&amp;can=b%270&amp;prior=deu/teros\" onclick=\"m(this,1,0); return false\" target=\"morph\">β᾽</a></span> =  <i><span class=\"en\">2</span></i>,<i><span class=\"en\">000</span></i>. </div><div class=\"lex_sense lex_sense2\"><b>II.</b> to represent <span class=\"greek\"><a href=\"morph?l=v&amp;la=greek&amp;can=v0&amp;prior=b'\" onclick=\"m(this,1,0); return false\" target=\"morph\">ϝ</a></span>, freq. in <i><span class=\"en\">Hsch.</span></i>, esp. in Lacon. words, cf. <span class=\"greek\"><a href=\"morph?l=bei%2Fkati&amp;la=greek&amp;can=bei%2Fkati0&amp;prior=v\" onclick=\"m(this,1,0); return false\" target=\"morph\">βείκατι</a>,</span> etc.</div> </div>"
+    }
+  }
+}

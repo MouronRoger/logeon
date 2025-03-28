@@ -1,15 +1,14 @@
-# Logeion Dictionary Scraper
+# Perseus Greek Dictionary Scraper
 
-A Python-based scraper for extracting lexicon entries from the Logeion online Greek dictionary (https://logeion.uchicago.edu/).
+A Python-based scraper for extracting lexicon entries from the Perseus Digital Library's Greek dictionaries, particularly the Liddell-Scott-Jones (LSJ) Greek-English Lexicon.
 
 ## Features
 
-- Asynchronous scraping with rate limiting and retry logic
-- Automatic discovery of Greek lemmas
-- SQLite database storage with progress tracking
-- Extracts multiple dictionary sources per lemma (LSJ, DGE, Bailly, etc.)
+- Direct URL access to dictionary entries without browser automation
+- SQLite database storage with efficient retrieval
+- Extracts both the main letter entries and specific word entries
 - Preserves both plain text and HTML formatting
-- Resumable scraping with error handling
+- Configurable scraping with rate limiting and retry logic
 
 ## Requirements
 
@@ -20,8 +19,8 @@ A Python-based scraper for extracting lexicon entries from the Logeion online Gr
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/logeion-scraper
-cd logeion-scraper
+git clone https://github.com/yourusername/perseus-scraper
+cd perseus-scraper
 ```
 
 2. Create and activate a virtual environment:
@@ -37,44 +36,57 @@ pip install -r requirements.txt
 
 ## Usage
 
-Run the scraper:
+### Basic Usage
+
+Run the LSJ scraper with default settings:
 ```bash
-python src/scraper.py
+python run_lsj_scraper.py
 ```
 
-The scraper will:
-1. Start from the Greek letter α
-2. Discover lemma pages
-3. Extract dictionary entries
-4. Store results in `logeion.sqlite`
+With limits (recommended for testing):
+```bash
+python run_lsj_scraper.py --limit-letters 3 --limit-groups 5
+```
+
+### Command Line Options
+
+- `--limit-letters` - Limit the number of letters to process
+- `--limit-groups` - Limit the number of entry groups per letter
+- `--delay` - Delay between requests in seconds (default: 1.2)
+- `--output` - Output JSON file path
+- `--force` - Force running without limits
 
 ## Database Schema
 
-### lexicon_entries
+The scraped data is stored in an SQLite database with the following structure:
+
+### entries
 - `id`: Primary key
-- `lemma`: Greek word
-- `lexicon_source`: Dictionary source (LSJ, DGE, etc.)
-- `definition`: Plain text definition
+- `lemma`: Greek word/entry key
+- `data`: JSON-encoded entry data
+- `created_at`: Timestamp
+
+### Data Format
+
+Each entry in the database contains:
+- `letter`: The Greek letter (Α, Β, etc.)
+- `group`: The word or entry group
 - `url`: Source URL
-- `raw_html`: Original HTML formatting
-- `created_at`: Timestamp
+- `content`: Content object with text and HTML
 
-### scrape_queue
-- `id`: Primary key
-- `url`: Target URL
-- `status`: pending/completed/error
-- `retry_count`: Number of attempts
-- `last_attempt`: Last try timestamp
-- `error_message`: Error details if any
-- `created_at`: Timestamp
+## Understanding Perseus URLs
 
-## Rate Limiting
+The Perseus LSJ URLs follow this pattern:
 
-The scraper implements respectful crawling:
-- 1.2 second delay between requests
-- Exponential backoff on errors
-- User-Agent identification
-- Maximum 3 retries per URL
+```
+# For a letter
+https://www.perseus.tufts.edu/hopper/text?doc=Perseus:text:1999.04.0057:alphabetic%20letter=*a
+
+# For a specific entry
+https://www.perseus.tufts.edu/hopper/text?doc=Perseus:text:1999.04.0057:entry=a)a/atos
+```
+
+Where `1999.04.0057` is the document ID for the LSJ lexicon.
 
 ## License
 
